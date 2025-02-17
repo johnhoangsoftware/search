@@ -22,7 +22,9 @@
     <h1>Teamwork Q&A Search</h1>
     <div class="search-container">
         <input type="text" id="searchInput" placeholder="Search for questions or answers..." oninput="searchQA()">
+        <button onclick="viewAll()">View All</button>
     </div>
+    
     <div id="results" class="results"></div>
 
     <script>
@@ -57,6 +59,46 @@
             const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
             worker.postMessage({ action: "search", searchTerm }); // Gửi từ khóa tìm kiếm đến Web Worker
         }
+
+        function viewAll() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = ''; 
+
+            if (qaData.length === 0) {
+                resultsDiv.innerHTML = '<p>No data available.</p>';
+                return;
+            }
+
+            qaData.forEach(qa => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question';
+                questionDiv.innerHTML = qa.question;
+                
+                const answersDiv = document.createElement('div');
+                answersDiv.className = 'answer';
+                qa.answers.forEach((answer, index) => {
+                    const answerP = document.createElement('p');
+                    answerP.innerHTML = `${index + 1}. ${answer}`;
+                    answersDiv.appendChild(answerP);
+                });
+
+                // Add correct answer if available
+                if (qa.correct_answer !== null) {
+                    const correctAnswerDiv = document.createElement('div');
+                    correctAnswerDiv.className = 'correct-answer';
+                    correctAnswerDiv.textContent = `Correct Answer: ${qa.correct_answer}`;
+                    answersDiv.appendChild(correctAnswerDiv);
+                }
+
+                resultItem.appendChild(questionDiv);
+                resultItem.appendChild(answersDiv);
+                resultsDiv.appendChild(resultItem);
+            });
+        }
+
 
         worker.onmessage = function(event) {
             const resultsDiv = document.getElementById('results');

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teamwork Q&A Search</title>
+    <link rel="stylesheet" href="./style.css">
+    <style>
+        /* Thêm style mới */
+        .correct-answer {
+            margin-top: 10px;
+            color: #2f855a;
+            font-weight: bold;
+            padding: 5px 10px;
+            background-color: #f0fff4;
+            border-radius: 4px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teamwork Q&A Search</h1>
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search for questions or answers..." oninput="searchQA()">
+    </div>
+    <div id="results" class="results"></div>
+
+    <script>
+        let qaData = [];
+        let worker = new Worker('./searchWorker.js'); // Tạo worker mới
+
+        async function loadData() {
+            try {
+                document.getElementById('results').innerHTML = '<div class="loading">Loading data...</div>';
+                const response = await fetch('./teamwork.json');
+                if (!response.ok) throw new Error('Failed to load data');
+
+                qaData = await response.json();
+                worker.postMessage({ action: "index", qaData }); // Lập chỉ mục bằng Web Worker
+                searchQA(); // Tự động tìm kiếm ban đầu
+            } catch (error) {
+                document.getElementById('results').innerHTML = `
+                    <div class="error">Error loading data: ${error.message}</div>
+                `;
+            }
+        }
+
+        function highlightText(text, searchTerm) {
+            if (!text || typeof text !== "string") return ""; // Kiểm tra dữ liệu đầu vào
+            if (!searchTerm) return text;
+            
+            return text.replace(new RegExp(`(${searchTerm})`, 'gi'), '<span class="highlight">$1</span>');
+        }
+
+
+        function searchQA() {
+            const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+            worker.postMessage({ action: "search", searchTerm }); // Gửi từ khóa tìm kiếm đến Web Worker
+        }
+
+        worker.onmessage = function(event) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            const matchingQA = event.data;
+            if (matchingQA.length === 0) {
+                resultsDiv.innerHTML = '<p>No results found.</p>';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            matchingQA.forEach(qa => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question';
+                questionDiv.innerHTML = highlightText(qa.question, document.getElementById('searchInput').value);
+
+                const answersDiv = document.createElement('div');
+                answersDiv.className = 'answer';
+                qa.answers.forEach((answer, index) => {
+                    const answerP = document.createElement('p');
+                    answerP.innerHTML = `${index + 1}. ${highlightText(answer, document.getElementById('searchInput').value)}`;
+                    answersDiv.appendChild(answerP);
+                });
+
+                if (qa.correct_answer !== null) {
+                    const correctAnswerDiv = document.createElement('div');
+                    correctAnswerDiv.className = 'correct-answer';
+                    correctAnswerDiv.textContent = `Correct Answer: ${qa.correct_answer}`;
+                    answersDiv.appendChild(correctAnswerDiv);
+                }
+
+                resultItem.appendChild(questionDiv);
+                resultItem.appendChild(answersDiv);
+                fragment.appendChild(resultItem);
+            });
+
+            resultsDiv.appendChild(fragment);
+        }
+
+        // Load data when page loads
+        loadData();
+    </script>
+</body>
+</html>
